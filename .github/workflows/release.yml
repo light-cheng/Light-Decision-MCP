@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish:
+    name: Test & Publish to npm (OIDC)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 24 (npm >= 11.5.1 for OIDC Trusted Publishing)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          # Intentionally omit registry-url so setup-node does not write an empty
+          # _authToken placeholder to .npmrc that would interfere with OIDC exchange.
+
+      - name: Set up Bun (Magpie plugin host load check)
+        uses: oven-sh/setup-bun@v2
+
+      - name: Verify release tag matches package.json version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            const expected = `v${pkg.version}`;
+            if (process.env.RELEASE_TAG !== expected) {
+              console.error(`Release tag (${process.env.RELEASE_TAG}) does not match package.json version (${expected})`);
+              process.exit(1);
+            }
+            console.log(`Verified tag ${expected} for ${pkg.name}`);
+          '
+
+      - name: Run test suite
+        run: npm test
+
+      - name: Verify Magpie plugin loads in Bun
+        run: bun -e 'import p from "./src/magpie-plugin.mjs"; await p.server({}, {}); console.log("BUN_LOAD_OK");'
+
+      - name: Publish package to npm with provenance
+        env:
+          IS_PRERELEASE: ${{ github.event.release.prerelease }}
+        run: |
+          PKG_NAME=$(node -p "require('./package.json').name")
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if npm view "${PKG_NAME}@${PKG_VERSION}" version >/dev/null 2>&1; then
+            echo "${PKG_NAME}@${PKG_VERSION} is already published on npm; skipping."
+            exit 0
+          fi
+          if [ "${IS_PRERELEASE}" = "true" ]; then
+            npm publish --provenance --access public --tag next
+          else
+            npm publish --provenance --access public
+          fi

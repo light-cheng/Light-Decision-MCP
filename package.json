@@ -9,8 +9,8 @@
     "./core": "./src/core/tools.mjs"
   },
   "bin": {
-    "light-decision-mcp": "./bin/cli.mjs",
-    "light-decision-mcp-stdio": "./bin/stdio.mjs"
+    "light-decision-mcp": "bin/cli.mjs",
+    "light-decision-mcp-stdio": "bin/stdio.mjs"
   },
   "files": [
     "src",
@@ -38,7 +38,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/light-cheng/Light-Decision-MCP.git"
+    "url": "git+https://github.com/light-cheng/Light-Decision-MCP.git"
   },
   "homepage": "https://github.com/light-cheng/Light-Decision-MCP#readme",
   "bugs": {
