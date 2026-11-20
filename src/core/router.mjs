@@ -8,6 +8,7 @@
  * - Executes bounded-concurrency batches with mid-batch circuit-aware fallback
  */
 
+import fs from "node:fs";
 import { createGoogleDirectBackend, createOpenAIDirectBackend } from "../backends/direct-cloud.mjs";
 import { createMagpieBackend } from "../backends/magpie.mjs";
 import { createPerplexityBackend } from "../backends/perplexity.mjs";
@@ -18,7 +19,20 @@ import { loadImages } from "./images.mjs";
 import { normalizeDecisionResponse } from "./normalize.mjs";
 import { exceedsDataDestination } from "./schema.mjs";
 
-export const PACKAGE_VERSION = "0.1.0";
+function readPackageVersion() {
+  try {
+    const raw = fs.readFileSync(new URL("../../package.json", import.meta.url), "utf8");
+    const parsed = JSON.parse(raw);
+    if (typeof parsed?.version === "string" && parsed.version.trim()) {
+      return parsed.version.trim();
+    }
+  } catch {
+    // Fallback if package.json is unavailable in a bundled environment
+  }
+  return "0.0.0";
+}
+
+export const PACKAGE_VERSION = readPackageVersion();
 
 const WIRE_QUESTION_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 
