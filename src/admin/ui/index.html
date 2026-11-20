@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Light Decision MCP — Admin</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <img class="logo" src="/icon.png" alt="Light Decision MCP" width="38" height="38">
+        <div>
+          <div class="title-row">
+            <h1>Light Decision MCP</h1>
+            <span class="ver" id="verTag">v0.1.0</span>
+          </div>
+          <p class="sub" data-t="subtitle">独立本地后台管理 · 仅绑定 127.0.0.1 · 改完自动热加载</p>
+        </div>
+      </div>
+      <div class="top-actions">
+        <button type="button" class="btn ghost small" id="langBtn">EN</button>
+        <button type="button" class="btn small" id="refreshBtn" data-t="refresh">刷新状态</button>
+      </div>
+    </header>
+
+    <nav class="tabs" role="tablist" id="navTabs">
+      <button type="button" role="tab" data-tab="overview" aria-selected="true" data-t="tabOverview">总览与后端</button>
+      <button type="button" role="tab" data-tab="routing" aria-selected="false" data-t="tabRouting">路由与自定义网关</button>
+      <button type="button" role="tab" data-tab="keys" aria-selected="false" data-t="tabKeys">密钥管理</button>
+      <button type="button" role="tab" data-tab="playground" aria-selected="false" data-t="tabPlayground">在线试跑</button>
+      <button type="button" role="tab" data-tab="clients" aria-selected="false" data-t="tabClients">硬件推荐与接入</button>
+    </nav>
+
+    <div class="toast" id="toast" hidden></div>
+
+    <!-- TAB 1: OVERVIEW -->
+    <section class="panel" data-panel="overview">
+      <div class="stats" id="statTiles"></div>
+      <div class="card">
+        <div class="card-head">
+          <h2 data-t="liveBackendsTitle">后端实时状态与熔断监控</h2>
+          <span class="mono muted" id="configPathLabel"></span>
+        </div>
+        <div class="backend-list" id="liveBackends"></div>
+      </div>
+    </section>
+
+    <!-- TAB 2: ROUTING & CUSTOM GATEWAYS -->
+    <section class="panel" data-panel="routing" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2 data-t="routingModeTitle">路由模式与默认策略</h2>
+          <span class="badge" id="modeBadge">api_with_local_fallback</span>
+        </div>
+        <div class="seg" role="tablist" id="modeSeg">
+          <button type="button" role="tab" data-mode="api_with_local_fallback" data-t="modeFallback">API 主力 + 本地 Fallback</button>
+          <button type="button" role="tab" data-mode="api_only" data-t="modeApi">仅 API</button>
+          <button type="button" role="tab" data-mode="local_only" data-t="modeLocal">仅本地</button>
+        </div>
+        <p class="hint" id="modeHint"></p>
+
+        <div class="grid2 mt">
+          <label class="field">
+            <span class="label" data-t="defaultBackendLabel">主力后端 (defaultBackend)</span>
+            <select id="defaultBackendSelect"></select>
+          </label>
+          <label class="field">
+            <span class="label" data-t="defaultModelLabel">默认模型 (defaultModel)</span>
+            <input type="text" id="defaultModelInput" placeholder="google/gemini-decision-1" spellcheck="false">
+          </label>
+        </div>
+
+        <div class="grid2 mt">
+          <label class="field">
+            <span class="label" data-t="fallbackBackendLabel">本地 Fallback 后端</span>
+            <select id="fallbackBackendSelect"></select>
+          </label>
+          <div class="field">
+            <span class="label" data-t="maxDestLabel">最大数据边界</span>
+            <div class="seg small" id="destSeg">
+              <button type="button" data-dest="on-device" data-t="destDevice">仅本机</button>
+              <button type="button" data-dest="private-network" data-t="destLan">私网</button>
+              <button type="button" data-dest="third-party" data-t="destCloud">允许云端</button>
+            </div>
+          </div>
+        </div>
+
+        <label class="toggle">
+          <input type="checkbox" id="fallbackUnconfCheck">
+          <span data-t="fallbackUnconfText">云端未配置 Key / 模型缺失时，也自动降级到本地模型</span>
+        </label>
+
+        <div class="grid3 mt">
+          <label class="field">
+            <span class="label" data-t="timeoutLabel">单后端超时 (ms)</span>
+            <input type="number" id="timeoutMsInput" min="1000" max="55000" step="1000">
+          </label>
+          <label class="field">
+            <span class="label" data-t="primaryTimeoutLabel">主力超时 (ms)</span>
+            <input type="number" id="primaryTimeoutMsInput" min="1000" max="50000" step="1000">
+          </label>
+          <label class="field">
+            <span class="label" data-t="fallbackTimeoutLabel">本地降级超时 (ms)</span>
+            <input type="number" id="fallbackTimeoutMsInput" min="1000" max="30000" step="1000">
+          </label>
+        </div>
+
+        <div class="grid3 mt">
+          <label class="field">
+            <span class="label" data-t="cbFailLabel">熔断失败阈值</span>
+            <input type="number" id="cbThresholdInput" min="1" max="10">
+          </label>
+          <label class="field">
+            <span class="label" data-t="cbCooldownLabel">熔断冷却 (ms)</span>
+            <input type="number" id="cbCooldownInput" min="1000" max="300000" step="1000">
+          </label>
+          <label class="field">
+            <span class="label" data-t="gatewayOverrideLabel">Magpie 网关覆盖 (可选)</span>
+            <input type="text" id="gatewayUrlInput" placeholder="http://127.0.0.1:3425" spellcheck="false">
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2 data-t="backendsEditorTitle">已配置后端与自定义网关</h2>
+          <button type="button" class="btn small" id="addBackendBtn" data-t="addGatewayBtn">+ 添加供应商 / 网关</button>
+        </div>
+        <p class="hint" data-t="backendsEditorHint">主力推荐 Magpie 网关（原生全协议、零存 Key）；也可启用/停用直连供应商，或一键添加 OpenRouter（云端聚合）、LiteLLM Proxy（自托管中转）、局域网 OpenDecider 及自定义 Decisions / System One 网关。</p>
+
+        <div class="preset-box mt" id="presetPicker" hidden>
+          <div class="preset-head">
+            <strong data-t="presetTitle">选择预设模板或自定义添加</strong>
+            <button type="button" class="btn small ghost" id="closePresetBtn" data-t="closeBtn">收起</button>
+          </div>
+          <div class="preset-grid">
+            <button type="button" class="preset-card" data-preset="openrouter">
+              <div class="preset-card-top">
+                <strong>OpenRouter</strong>
+                <span class="badge neutral" data-t="catCloudAgg">云端聚合</span>
+              </div>
+              <span class="hint" data-t="presetOpenRouterDesc">云端模型平台 · 原生 /api/alpha/decisions · 单个 OPENROUTER_API_KEY 调多家模型</span>
+            </button>
+            <button type="button" class="preset-card" data-preset="litellm">
+              <div class="preset-card-top">
+                <strong>LiteLLM Proxy</strong>
+                <span class="badge neutral" data-t="catSelfHosted">自托管网关</span>
+              </div>
+              <span class="hint" data-t="presetLiteLLMDesc">开源自建中转站（类似 New API）· 原生 /v1/decisions · 默认 :4000</span>
+            </button>
+            <button type="button" class="preset-card" data-preset="lan-opendecider">
+              <div class="preset-card-top">
+                <strong>LAN OpenDecider</strong>
+                <span class="badge neutral" data-t="catLanNode">局域网节点</span>
+              </div>
+              <span class="hint" data-t="presetLanDesc">内网 Mac/GPU 机器运行的 opendecider serve · 仅私网通信不出外网</span>
+            </button>
+          </div>
+          <div class="preset-custom">
+            <label class="field">
+              <span class="label" data-t="customIdLabel">自定义 ID</span>
+              <input type="text" id="customGwId" placeholder="my-gateway" spellcheck="false">
+            </label>
+            <label class="field">
+              <span class="label" data-t="customProtoLabel">协议类型</span>
+              <select id="customGwType">
+                <option value="openai-decisions">openai-decisions (/v1/decisions)</option>
+                <option value="systemone">systemone (/v1/systemone)</option>
+                <option value="gemini-decisions">gemini-decisions (/v1beta/decisions)</option>
+              </select>
+            </label>
+            <button type="button" class="btn primary small" id="addCustomGwBtn" data-t="addCustomBtn">添加自定义</button>
+          </div>
+        </div>
+
+        <div class="editor-list mt" id="backendsEditor"></div>
+        <div class="actions">
+          <button type="button" class="btn primary" id="saveConfigBtn" data-t="saveConfigBtn">保存配置到 config.json</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: API KEYS -->
+    <section class="panel" data-panel="keys" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2 data-t="keysTitle">直连供应商与自定义网关密钥（零明文回显）</h2>
+          <span class="mono muted" id="secretsPathLabel"></span>
+        </div>
+        <p class="hint" data-t="keysHint">走 Magpie 网关的供应商（Google / TypeSafe / OpenAI 等）请在 Magpie「供应商」页配置。此处仅管理脱离 Magpie 或 Perplexity / 自定义网关使用的直连密钥，以 0600 权限存入本地 secrets.json（或 macOS 钥匙串），绝不写入仓库或 config.json。</p>
+
+        <div class="key-list" id="keyList"></div>
+
+        <form class="key-form" id="keyForm">
+          <div class="grid3">
+            <label class="field">
+              <span class="label" data-t="keyNameLabel">密钥变量名 (apiKeyEnv)</span>
+              <input type="text" id="keyNameInput" placeholder="PERPLEXITY_API_KEY" list="knownKeyNames" required spellcheck="false">
+              <datalist id="knownKeyNames">
+                <option value="PERPLEXITY_API_KEY"></option>
+                <option value="OPENROUTER_API_KEY"></option>
+                <option value="TYPESAFE_API_KEY"></option>
+                <option value="GEMINI_API_KEY"></option>
+                <option value="OPENAI_API_KEY"></option>
+              </datalist>
+            </label>
+            <label class="field">
+              <span class="label" data-t="keyValueLabel">API Key（不会明文回显）</span>
+              <input type="password" id="keyValueInput" placeholder="sk-... / pplx-..." required autocomplete="off">
+            </label>
+            <label class="field">
+              <span class="label" data-t="keyStoreLabel">存储位置</span>
+              <select id="keyStoreSelect">
+                <option value="file">secrets.json (0600)</option>
+                <option value="keychain" id="keychainOpt" data-t="keychainOptLabel">macOS 钥匙串</option>
+              </select>
+            </label>
+          </div>
+          <div class="actions">
+            <button type="submit" class="btn primary" data-t="saveKeyBtn">安全保存密钥</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- TAB 4: PLAYGROUND -->
+    <section class="panel" data-panel="playground" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2 data-t="pgTitle">在线决策试跑</h2>
+          <span class="muted" id="pgSummary"></span>
+        </div>
+        <div class="grid3">
+          <label class="field">
+            <span class="label" data-t="pgToolLabel">工具</span>
+            <select id="pgTool">
+              <option value="yes_no">yes_no (noul)</option>
+              <option value="choose">choose</option>
+              <option value="score">score</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="label" data-t="pgModeLabel">路由模式覆盖</span>
+            <select id="pgMode">
+              <option value="" data-t="pgUseDefault">使用默认配置</option>
+              <option value="api_with_local_fallback">api_with_local_fallback</option>
+              <option value="api_only">api_only</option>
+              <option value="local_only">local_only</option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="label" data-t="pgBackendLabel">指定后端（可选）</span>
+            <select id="pgBackend"></select>
+          </label>
+        </div>
+
+        <label class="field mt">
+          <span class="label" data-t="pgStateLabel">输入状态 (state)</span>
+          <textarea id="pgState" rows="3">Our production checkout API has been returning 502 errors for 15 minutes.</textarea>
+        </label>
+
+        <div class="grid2 mt">
+          <label class="field">
+            <span class="label" data-t="pgQuestionLabel">问题 (question)</span>
+            <input type="text" id="pgQuestion" value="Does this report a production outage?">
+          </label>
+          <label class="field" id="pgItemsField" hidden>
+            <span class="label" id="pgItemsLabel">选项 / 档位（逗号分隔）</span>
+            <input type="text" id="pgItems" value="low, medium, high, critical">
+          </label>
+        </div>
+
+        <div class="actions">
+          <button type="button" class="btn primary" id="runTestBtn" data-t="pgRunBtn">运行测试</button>
+        </div>
+        <pre class="code-out" id="pgOutput" hidden></pre>
+      </div>
+    </section>
+
+    <!-- TAB 5: HARDWARE & CLIENTS -->
+    <section class="panel" data-panel="clients" hidden>
+      <div class="card">
+        <div class="card-head">
+          <h2 data-t="hwTitle">实测本机硬件与本地模型推荐</h2>
+          <button type="button" class="btn small" id="reprobeHwBtn" data-t="reprobeBtn">重新检测</button>
+        </div>
+        <div id="hwContent" class="muted" data-t="hwLoading">正在检测…</div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2 data-t="snippetsTitle">独立 MCP 客户端接入配置（零 Magpie 依赖）</h2>
+        </div>
+        <div class="seg small" id="clientSeg">
+          <button type="button" data-client="claude-desktop" aria-selected="true">Claude Desktop</button>
+          <button type="button" data-client="claude-code">Claude Code</button>
+          <button type="button" data-client="cursor">Cursor / Zed</button>
+          <button type="button" data-client="cc-switch">CC Switch</button>
+          <button type="button" data-client="magpie" data-t="clientMagpie">Magpie 插件</button>
+        </div>
+        <div class="snippet-box mt">
+          <pre class="code-out" id="clientSnippet"></pre>
+          <button type="button" class="btn small copy-btn" id="copySnippetBtn" data-t="copy">复制</button>
+        </div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

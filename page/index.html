@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Light Decision MCP</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- Magpie sandboxed plugin page: no inline scripts, zero network requests.
+       _magpie/bridge.js handles theme, language, and magpie.options.get/set. -->
+  <script src="_magpie/bridge.js"></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <main class="wrap">
+    <header class="head">
+      <div class="brand">
+        <img class="logo" src="icon.png" alt="" width="40" height="40">
+        <div>
+          <h1 data-t="title">Light Decision MCP</h1>
+          <p class="sub" data-t="subtitle">多后端 System One 决策路由 · 可视化配置</p>
+        </div>
+      </div>
+      <span class="pill" id="savePill" data-state="idle" data-t="statusIdle">已加载</span>
+    </header>
+
+    <section class="card">
+      <div class="card-head">
+        <h2 data-t="routingTitle">路由模式</h2>
+        <span class="badge" id="modeBadge">api_with_local_fallback</span>
+      </div>
+      <div class="seg" role="tablist" id="modeSeg">
+        <button type="button" role="tab" data-mode="api_with_local_fallback" data-t="modeFallback">API 主力 + 本地 Fallback</button>
+        <button type="button" role="tab" data-mode="api_only" data-t="modeApi">仅 API</button>
+        <button type="button" role="tab" data-mode="local_only" data-t="modeLocal">仅本地</button>
+      </div>
+      <p class="hint" id="modeDesc"></p>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2 data-t="primaryTitle">主力后端与默认模型</h2>
+      </div>
+      <div class="grid2">
+        <label class="field">
+          <span class="label" data-t="backendLabel">主力后端 (defaultBackend)</span>
+          <select id="defaultBackend">
+            <optgroup id="ogRec" label="推荐本地网关">
+              <option value="magpie" data-t="optMagpie">Magpie 网关（推荐 · 零存 Key）</option>
+            </optgroup>
+            <optgroup id="ogLocal" label="本机离线模型">
+              <option value="local-opendecider" data-t="optLocal">本地 OpenDecider (127.0.0.1:8001)</option>
+            </optgroup>
+            <optgroup id="ogCloud" label="云端直连与聚合">
+              <option value="google-direct" data-t="optGoogleDirect">Google Gemini Decisions（直连）</option>
+              <option value="typesafe" data-t="optTypeSafe">TypeSafe Jev（直连）</option>
+              <option value="perplexity" data-t="optPerplexity">Perplexity Decisions（直连）</option>
+              <option value="openai-direct" data-t="optOpenAIDirect">OpenAI Decisions（直连）</option>
+              <option value="openrouter" data-t="optOpenRouter">OpenRouter（云端聚合）</option>
+            </optgroup>
+            <optgroup id="ogCustom" label="自定义后端">
+              <option value="__custom__" data-t="optCustom">自定义后端 ID（来自 config.json）…</option>
+            </optgroup>
+          </select>
+          <input type="text" id="customBackendId" placeholder="litellm / my-gateway" autocomplete="off" spellcheck="false" hidden>
+        </label>
+        <label class="field">
+          <span class="label" data-t="modelLabel">默认模型 (defaultModel)</span>
+          <input type="text" id="defaultModel" placeholder="google/gemini-decision-1" autocomplete="off" spellcheck="false">
+        </label>
+      </div>
+      <div class="chips" id="modelChips" aria-label="Model presets">
+        <button type="button" class="chip" data-backend="magpie" data-model="google/gemini-decision-1">google/gemini-decision-1</button>
+        <button type="button" class="chip" data-backend="magpie" data-model="typesafe/jev-latest">typesafe/jev-latest</button>
+        <button type="button" class="chip" data-backend="magpie" data-model="openai/gpt-6-luna">openai/gpt-6-luna</button>
+        <button type="button" class="chip" data-backend="perplexity" data-model="pplx-decider-v1.3">pplx-decider-v1.3</button>
+        <button type="button" class="chip" data-backend="local-opendecider" data-model="local-opendecider">local-opendecider</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2 data-t="guardTitle">本地降级与数据边界</h2>
+      </div>
+      <div class="grid2">
+        <label class="field">
+          <span class="label" data-t="fallbackBackendLabel">本地 Fallback 后端</span>
+          <input type="text" id="fallbackBackend" placeholder="local-opendecider" autocomplete="off" spellcheck="false">
+        </label>
+        <div class="field">
+          <span class="label" data-t="boundaryLabel">最大数据边界 (maxDataDestination)</span>
+          <div class="seg small" role="tablist" id="destSeg">
+            <button type="button" role="tab" data-dest="on-device" data-t="destDevice">仅本机</button>
+            <button type="button" role="tab" data-dest="private-network" data-t="destLan">私网</button>
+            <button type="button" role="tab" data-dest="third-party" data-t="destCloud">允许云端</button>
+          </div>
+        </div>
+      </div>
+      <label class="toggle">
+        <input type="checkbox" id="fallbackOnNotConfigured">
+        <span data-t="fallbackUnconfLabel">云端未配置 Key / 模型缺失时，也自动降级到本地模型</span>
+      </label>
+      <p class="hint" data-t="multimodalNote">含图片的请求遇到文本本地后端时，默认拒绝静默丢弃图片降级，防止模型盲猜。</p>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2 data-t="timingTitle">超时预算与网关覆盖</h2>
+      </div>
+      <div class="grid3">
+        <label class="field">
+          <span class="label" data-t="timeoutLabel">单后端超时 (ms)</span>
+          <input type="number" id="timeoutMs" min="1000" max="55000" step="1000" placeholder="25000">
+        </label>
+        <label class="field">
+          <span class="label" data-t="primaryTimeoutLabel">主力超时 (ms)</span>
+          <input type="number" id="primaryTimeoutMs" min="1000" max="50000" step="1000" placeholder="15000">
+        </label>
+        <label class="field">
+          <span class="label" data-t="fallbackTimeoutLabel">本地降级超时 (ms)</span>
+          <input type="number" id="fallbackTimeoutMs" min="1000" max="30000" step="1000" placeholder="10000">
+        </label>
+      </div>
+      <label class="field" style="margin-top: 10px;">
+        <span class="label" data-t="gatewayLabel">自定义网关地址（留空自动读取 gateway.json）</span>
+        <input type="text" id="gatewayUrl" placeholder="http://127.0.0.1:3425" autocomplete="off" spellcheck="false">
+      </label>
+      <div class="actions">
+        <button type="button" class="btn" id="resetBtn" data-t="resetBtn">清空覆盖（回退到 config.json）</button>
+        <button type="button" class="btn primary" id="saveBtn" data-t="saveBtn">立即保存</button>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2 data-t="keysTitle">API Key 配在哪里 &amp; 本地向导</h2>
+      </div>
+      <div class="guide-list">
+        <div class="guide-row">
+          <div>
+            <strong data-t="guideMagpieTitle">Google / TypeSafe / OpenAI / 百炼 / 方舟</strong>
+            <p class="hint" data-t="guideMagpieDesc">直接在 Magpie 左侧「供应商 / Providers」页面配置，或终端执行下方命令（插件零存 Key）：</p>
+          </div>
+          <div class="cmd-row">
+            <code id="cmdGoogle">magpie provider add google &lt;API_KEY&gt;</code>
+            <button type="button" class="btn small copy" data-copy="cmdGoogle" data-t="copy">复制</button>
+          </div>
+        </div>
+
+        <div class="guide-row">
+          <div>
+            <strong data-t="guideDirectTitle">Perplexity 等 Magpie 暂未内置的直连 Key</strong>
+            <p class="hint" data-t="guideDirectDesc">写入本机 0600 仅当前用户可读凭据文件（或 --keychain 存 macOS 钥匙串），Magpie 桌面端同样生效：</p>
+          </div>
+          <div class="cmd-row">
+            <code id="cmdKey">light-decision-mcp key set PERPLEXITY_API_KEY</code>
+            <button type="button" class="btn small copy" data-copy="cmdKey" data-t="copy">复制</button>
+          </div>
+        </div>
+
+        <div class="guide-row">
+          <div>
+            <strong data-t="guideWizardTitle">本地模型硬件推荐、诊断与安装向导</strong>
+            <p class="hint" data-t="guideWizardDesc">实测 CPU/内存/GPU/磁盘并检查所有后端健康状态：</p>
+          </div>
+          <div class="cmd-row">
+            <code id="cmdDoctor">light-decision-mcp doctor</code>
+            <button type="button" class="btn small copy" data-copy="cmdDoctor" data-t="copy">复制</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <p class="error" id="errorBox" hidden></p>
+  </main>
+</body>
+</html>
